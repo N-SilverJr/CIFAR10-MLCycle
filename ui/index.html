@@ -1,267 +1,233 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CIFAR-10 ML Cycle – Image Classifier</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <style>
-    .sidebar-open { transform: translateX(0) !important; }
-    @media (max-width: 1023px) {
-      #sidebar { transform: translateX(-100%); transition: transform 0.2s; }
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CIFAR-10 Cycle · ML Ops Console</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config={theme:{extend:{
+colors:{ink:{950:"#0a0e12",900:"#0f1419",800:"#161b22",700:"#1c2430",600:"#243044"},mint:{400:"#34d399",500:"#10b981",600:"#059669"},sand:{400:"#fbbf24"}},
+fontFamily:{sans:["IBM Plex Sans","system-ui","sans-serif"],mono:["IBM Plex Mono","ui-monospace","monospace"]},
+boxShadow:{glow:"0 0 24px rgba(16,185,129,0.15)"},
+keyframes:{pulseDot:{"0%,100%":{opacity:"1",transform:"scale(1)"},"50%":{opacity:"0.5",transform:"scale(1.35)"}},fadeUp:{from:{opacity:"0",transform:"translateY(12px)"},to:{opacity:"1",transform:"translateY(0)"}}},
+animation:{pulseDot:"pulseDot 1.6s ease-in-out infinite",fadeUp:"fadeUp 0.4s ease-out both"}
+}}}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;background:#0a0e12;color:#e5e7eb}
+.glass{background:linear-gradient(145deg,rgba(28,36,48,.9),rgba(22,27,34,.85));border:1px solid rgba(255,255,255,.06);backdrop-filter:blur(12px)}
+.nav-pill{transition:all .2s ease}
+.nav-pill.active{background:rgba(16,185,129,.15);color:#34d399;box-shadow:inset 0 0 0 1px rgba(16,185,129,.35)}
+.nav-pill:not(.active):hover{background:rgba(255,255,255,.05);color:#fff}
+.drop-zone{border:1.5px dashed rgba(16,185,129,.35);transition:all .25s ease}
+.drop-zone:hover,.drop-zone.dragover{border-color:#10b981;background:rgba(16,185,129,.06);box-shadow:0 0 32px rgba(16,185,129,.12)}
+.metric-card{transition:transform .2s ease,box-shadow .2s ease}
+.metric-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.4)}
+.step-line{height:2px;background:rgba(255,255,255,.08);flex:1}
+.step-dot{width:28px;height:28px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:#1c2430;border:1px solid rgba(255,255,255,.1);color:#9ca3af}
+.step-dot.done{background:rgba(16,185,129,.2);border-color:#10b981;color:#34d399}
+.step-dot.active{background:#10b981;border-color:#10b981;color:#0a0e12}
+.timeline-item::before{content:"";position:absolute;left:11px;top:28px;bottom:-16px;width:2px;background:rgba(255,255,255,.08)}
+.timeline-item:last-child::before{display:none}
+.panel{display:none;animation:fadeUp .35s ease-out}
+.panel.active{display:block}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0f1419}
+::-webkit-scrollbar-thumb{background:#243044;border-radius:4px}
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
+<body class="min-h-screen bg-ink-950 text-gray-200">
 
-<!-- Sidebar backdrop (mobile) -->
-<div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-40 hidden lg:hidden"></div>
-
-<div class="flex min-h-screen">
-  <!-- Sidebar -->
-  <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
-    <div class="p-4 border-b border-gray-800 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white">ML</div>
-      <div>
-        <div class="font-semibold text-sm">CIFAR-10 Cycle</div>
-        <div class="text-xs text-gray-400">Image Classification</div>
-      </div>
-    </div>
-
-    <nav class="flex-1 p-3 space-y-1">
-      <button data-tab="dashboard" class="w-full text-left px-4 py-3 rounded-lg transition-all duration-200 border-l-2 flex items-start gap-3 text-white bg-blue-600/15 border-blue-500">
-        <span class="mt-0.5">📊</span>
-        <div>
-          <div class="font-medium text-sm">Dashboard</div>
-          <div class="text-xs text-gray-400">System health & status</div>
-        </div>
-      </button>
-      <button data-tab="predict" class="w-full text-left px-4 py-3 rounded-lg transition-all duration-200 border-l-2 flex items-start gap-3 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border-transparent">
-        <span class="mt-0.5">🔍</span>
-        <div>
-          <div class="font-medium text-sm">Predict</div>
-          <div class="text-xs text-gray-400">Single image recognition</div>
-        </div>
-      </button>
-      <button data-tab="visualizations" class="w-full text-left px-4 py-3 rounded-lg transition-all duration-200 border-l-2 flex items-start gap-3 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border-transparent">
-        <span class="mt-0.5">📈</span>
-        <div>
-          <div class="font-medium text-sm">Visualizations</div>
-          <div class="text-xs text-gray-400">Data & model insights</div>
-        </div>
-      </button>
-      <button data-tab="retrain" class="w-full text-left px-4 py-3 rounded-lg transition-all duration-200 border-l-2 flex items-start gap-3 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border-transparent">
-        <span class="mt-0.5">🔄</span>
-        <div>
-          <div class="font-medium text-sm">Retrain</div>
-          <div class="text-xs text-gray-400">Upload data & retrain</div>
-        </div>
-      </button>
-      <button data-tab="history" class="w-full text-left px-4 py-3 rounded-lg transition-all duration-200 border-l-2 flex items-start gap-3 text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border-transparent">
-        <span class="mt-0.5">📜</span>
-        <div>
-          <div class="font-medium text-sm">History</div>
-          <div class="text-xs text-gray-400">Retraining audit log</div>
-        </div>
-      </button>
-    </nav>
-
-    <div class="p-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
-      <div class="flex items-center gap-2">
-        <span id="sidebar-status-dot" class="w-2 h-2 rounded-full bg-red-500"></span>
-        <span id="sidebar-status-text">Offline</span>
-      </div>
-      <div id="sidebar-uptime-compact">--</div>
-    </div>
-  </aside>
-
-  <!-- Main content -->
-  <div class="flex-1 flex flex-col min-w-0">
-    <!-- Top bar -->
-    <header class="h-14 border-b border-gray-800 flex items-center justify-between px-4 lg:px-6 bg-gray-900/50">
-      <div class="flex items-center gap-3">
-        <button id="sidebar-toggle" class="lg:hidden p-2 rounded-md hover:bg-gray-800">☰</button>
-        <h1 id="top-bar-title" class="font-semibold">Dashboard</h1>
-      </div>
-      <span id="deployment-badge" class="text-xs text-gray-400 bg-gray-800 rounded-full px-3 py-1">Local</span>
-    </header>
-
-    <main class="flex-1 overflow-auto p-4 lg:p-6">
-      <!-- DASHBOARD -->
-      <div id="panel-dashboard" data-panel class="">
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-400 mb-1">Status</div>
-            <div class="flex items-center gap-2">
-              <span id="status-dot" class="w-2 h-2 rounded-full bg-green-500 hidden"></span>
-              <span id="status-badge" class="text-sm font-semibold text-red-400">Offline</span>
-            </div>
-            <div class="text-xs text-gray-500 mt-1">Live server state</div>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-400 mb-1">Uptime</div>
-            <div id="stat-uptime" class="text-lg font-semibold">--</div>
-            <div class="text-xs text-gray-500 mt-1">since server start</div>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-400 mb-1">Last Trained</div>
-            <div id="stat-last-trained" class="text-sm font-semibold truncate">--</div>
-            <div class="text-xs text-gray-500 mt-1">most recent promotion</div>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <div class="text-xs text-gray-400 mb-1">Parameters</div>
-            <div id="stat-params" class="text-lg font-semibold">--</div>
-            <div class="text-xs text-gray-500 mt-1">model size</div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-medium mb-3">Quick Predict</h3>
-            <div id="quick-drop-zone" class="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition">
-              <input type="file" id="quick-file-input" accept="image/*" class="hidden" />
-              <p class="text-sm text-gray-400">Drop an image or click to browse</p>
-            </div>
-            <div id="quick-result" class="mt-4 hidden">
-              <div class="text-2xl font-bold" id="quick-pred-class">-</div>
-              <div class="text-sm text-gray-400"><span id="quick-pred-conf">--</span> confidence · <span id="quick-pred-ms">--</span> ms</div>
-            </div>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-medium mb-3">About CIFAR-10</h3>
-            <p class="text-sm text-gray-400 leading-relaxed">
-              60 000 colour images (32×32) across 10 classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck.
-              This dashboard serves a custom CNN trained offline and continuously improved via the safety-gated retraining pipeline.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- PREDICT -->
-      <div id="panel-predict" data-panel class="hidden">
-        <div class="max-w-2xl mx-auto">
-          <div id="drop-zone" class="border-2 border-dashed border-gray-700 rounded-xl p-10 text-center cursor-pointer hover:border-blue-500 transition bg-gray-900">
-            <input type="file" id="file-input" accept="image/*" class="hidden" />
-            <p class="text-gray-400">Drop an image here or click to browse</p>
-            <p class="text-xs text-gray-500 mt-2">PNG, JPG, JPEG, BMP · will be resized to 32×32 RGB</p>
-          </div>
-
-          <div id="pred-result" class="mt-6 hidden bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <div class="flex items-center gap-6">
-              <img id="pred-preview" class="w-24 h-24 object-cover rounded-lg border border-gray-700" />
-              <div>
-                <div class="text-3xl font-bold" id="pred-class">-</div>
-                <div class="text-sm text-gray-400 mt-1">
-                  <span id="pred-conf">--</span> confidence · <span id="pred-ms">--</span> ms
-                </div>
-              </div>
-            </div>
-            <div class="mt-4">
-              <canvas id="prob-chart" height="120"></canvas>
-            </div>
-            <button id="clear-btn" class="mt-4 btn btn-sm btn-ghost">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- VISUALIZATIONS -->
-      <div id="panel-visualizations" data-panel class="hidden">
-        <div id="viz-empty" class="text-center text-gray-400 py-12">
-          No evaluation data available yet. Train or retrain the model to generate visualizations.
-        </div>
-        <div id="viz-content" class="hidden space-y-6">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 class="font-medium mb-3">Training Data: Class Distribution</h3>
-              <canvas id="dist-chart" height="200"></canvas>
-              <p class="text-xs text-gray-500 mt-3">CIFAR-10 is perfectly balanced (5 000 images per class in the training split). This removes the need for class weighting.</p>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 class="font-medium mb-3">Model Performance: Per-Class F1</h3>
-              <canvas id="f1-chart" height="200"></canvas>
-              <p class="text-xs text-gray-500 mt-3">Animals (cat, dog, bird, deer) are typically harder than vehicles because of higher intra-class visual variation.</p>
-            </div>
-          </div>
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-medium mb-3">Confusion Matrix</h3>
-            <div class="overflow-x-auto">
-              <canvas id="cm-chart" height="280"></canvas>
-            </div>
-            <p class="text-xs text-gray-500 mt-3">Off-diagonal cells highlight the most frequent confusions (e.g. cat ↔ dog, automobile ↔ truck).</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- RETRAIN -->
-      <div id="panel-retrain" data-panel class="hidden">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl">
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-medium mb-4">Upload Training Data</h3>
-            <label class="block text-sm text-gray-400 mb-1">Select class label</label>
-            <select id="upload-label" class="select select-bordered w-full bg-gray-800 border-gray-700 mb-3">
-              <option value="0">0 – airplane</option>
-              <option value="1">1 – automobile</option>
-              <option value="2">2 – bird</option>
-              <option value="3">3 – cat</option>
-              <option value="4">4 – deer</option>
-              <option value="5">5 – dog</option>
-              <option value="6">6 – frog</option>
-              <option value="7">7 – horse</option>
-              <option value="8">8 – ship</option>
-              <option value="9">9 – truck</option>
-            </select>
-            <input type="file" id="upload-files" accept="image/*" multiple class="file-input file-input-bordered w-full bg-gray-800 border-gray-700 mb-3" />
-            <button id="upload-images-btn" class="btn btn-primary btn-sm w-full mb-4">Upload Images</button>
-
-            <div class="divider text-xs text-gray-500">OR</div>
-            <p class="text-xs text-gray-400 mb-2">Upload a ZIP containing folders named 0–9 (class indices)</p>
-            <input type="file" id="upload-zip" accept=".zip" class="file-input file-input-bordered w-full bg-gray-800 border-gray-700 mb-3" />
-            <button id="upload-zip-btn" class="btn btn-secondary btn-sm w-full">Upload ZIP</button>
-            <p id="upload-status" class="text-xs text-gray-500 mt-3">0 images uploaded this session</p>
-            <div id="upload-alert"></div>
-          </div>
-
-          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <h3 class="font-medium mb-4">Trigger Retraining</h3>
-            <p class="text-sm text-gray-400 mb-4">
-              Fine-tunes the current model on all images currently in <code class="text-blue-400">data/retrain/</code>.
-              A safety gate evaluates the new model on the held-out test set; it is promoted only if accuracy does not drop more than 1 percentage point.
-            </p>
-            <button id="retrain-btn" class="btn btn-accent w-full">Retrain Model</button>
-            <div id="retrain-alert" class="mt-4"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- HISTORY -->
-      <div id="panel-history" data-panel class="hidden">
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 overflow-x-auto">
-          <h3 class="font-medium mb-4">Retraining Audit Log</h3>
-          <p class="text-sm text-gray-400 mb-4">Complete history of all retraining attempts, including promoted and rejected runs.</p>
-          <table class="table table-sm w-full">
-            <thead>
-              <tr class="text-gray-400">
-                <th>Timestamp</th>
-                <th>Status</th>
-                <th>Baseline Acc</th>
-                <th>New Acc</th>
-                <th>Change</th>
-                <th>Samples</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody id="history-body">
-              <tr><td colspan="7" class="text-center text-gray-500">No retraining events yet.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-  </div>
+<header class="sticky top-0 z-40 border-b border-white/5 bg-ink-900/90 backdrop-blur-md">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
+<div class="flex items-center gap-3 shrink-0">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-mint-500 to-emerald-700 flex items-center justify-center shadow-glow">
+<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-ink-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.611L5 14.5"/></svg>
 </div>
+<div class="hidden sm:block"><div class="text-sm font-semibold text-white tracking-tight">CIFAR-10 Cycle</div><div class="text-[11px] text-gray-500 font-mono">ML Ops Console</div></div>
+</div>
+<nav class="flex-1 flex items-center gap-1 overflow-x-auto py-1" role="tablist" aria-label="Main navigation">
+<button type="button" data-tab="dashboard" class="nav-pill active px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap" aria-selected="true">Overview</button>
+<button type="button" data-tab="predict" class="nav-pill px-3 py-1.5 rounded-full text-sm font-medium text-gray-400 whitespace-nowrap">Inference</button>
+<button type="button" data-tab="visualizations" class="nav-pill px-3 py-1.5 rounded-full text-sm font-medium text-gray-400 whitespace-nowrap">Analytics</button>
+<button type="button" data-tab="retrain" class="nav-pill px-3 py-1.5 rounded-full text-sm font-medium text-gray-400 whitespace-nowrap">Retrain</button>
+<button type="button" data-tab="history" class="nav-pill px-3 py-1.5 rounded-full text-sm font-medium text-gray-400 whitespace-nowrap">Activity</button>
+</nav>
+<div class="flex items-center gap-2 shrink-0">
+<div id="deployment-badge" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-full bg-ink-700 text-gray-400 border border-white/5">ENV</div>
+<div id="status-chip" class="inline-flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-full bg-ink-700 border border-white/5">
+<span id="status-dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulseDot" aria-hidden="true"></span>
+<span id="status-badge" class="text-red-400">Offline</span>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
+<section id="panel-dashboard" class="panel active" role="tabpanel">
+<div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+<div><h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Model Console</h1><p class="text-sm text-gray-500 mt-1">Custom CNN · CIFAR-10 · 10-class image recognition</p></div>
+<div class="flex items-center gap-2 text-xs font-mono text-gray-500"><span>Synced</span><span id="last-sync" class="text-gray-400">—</span></div>
+</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+<article class="metric-card glass rounded-2xl p-4 border-l-2 border-l-mint-500"><div class="flex items-center justify-between mb-2"><span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Status</span></div><div id="metric-status" class="text-xl font-semibold text-white">—</div><div class="text-[11px] text-gray-500 mt-1">Live server state</div></article>
+<article class="metric-card glass rounded-2xl p-4 border-l-2 border-l-cyan-400"><div class="flex items-center justify-between mb-2"><span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Uptime</span></div><div id="metric-uptime" class="text-xl font-semibold text-white font-mono">—</div><div class="text-[11px] text-gray-500 mt-1">Since process start</div></article>
+<article class="metric-card glass rounded-2xl p-4 border-l-2 border-l-sand-400"><div class="flex items-center justify-between mb-2"><span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Last trained</span></div><div id="metric-trained" class="text-sm font-semibold text-white truncate">—</div><div class="text-[11px] text-gray-500 mt-1">Model file mtime</div></article>
+<article class="metric-card glass rounded-2xl p-4 border-l-2 border-l-violet-400"><div class="flex items-center justify-between mb-2"><span class="text-[11px] uppercase tracking-wider text-gray-500 font-medium">Parameters</span></div><div id="metric-params" class="text-xl font-semibold text-white font-mono">—</div><div class="text-[11px] text-gray-500 mt-1">Trainable weights</div></article>
+</div>
+<div class="grid lg:grid-cols-5 gap-4">
+<div class="lg:col-span-3 glass rounded-2xl p-5 sm:p-6">
+<div class="flex items-center justify-between mb-4"><h2 class="text-sm font-semibold text-white">Quick inference</h2><span class="text-[10px] font-mono text-gray-500 uppercase tracking-wider">PNG · JPG · BMP</span></div>
+<div id="quick-drop-zone" class="drop-zone rounded-xl p-8 sm:p-10 text-center cursor-pointer" role="button" tabindex="0" aria-label="Upload image for quick prediction">
+<input id="quick-file-input" type="file" accept="image/png,image/jpeg,image/bmp" class="hidden"/>
+<div class="mx-auto w-14 h-14 rounded-2xl bg-mint-500/10 border border-mint-500/20 flex items-center justify-center mb-4"><svg class="w-7 h-7 text-mint-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg></div>
+<p class="text-sm text-gray-300 font-medium">Drop an image or click to browse</p>
+<p class="text-xs text-gray-500 mt-1">32×32 RGB preferred · any size will be resized</p>
+</div>
+<div id="quick-result" class="hidden mt-4 glass rounded-xl p-4 border border-mint-500/20">
+<div class="flex items-center justify-between gap-3">
+<div><div class="text-[11px] text-gray-500 uppercase tracking-wider">Predicted</div><div id="quick-class" class="text-lg font-semibold text-mint-400"></div></div>
+<div class="text-right"><div class="text-[11px] text-gray-500 uppercase tracking-wider">Confidence</div><div id="quick-conf" class="text-lg font-mono font-semibold text-white"></div></div>
+</div>
+<div class="mt-3 h-1.5 rounded-full bg-ink-700 overflow-hidden"><div id="quick-conf-bar" class="h-full rounded-full bg-gradient-to-r from-mint-600 to-mint-400 transition-all duration-500" style="width:0%"></div></div>
+</div>
+</div>
+<div class="lg:col-span-2 glass rounded-2xl p-5 sm:p-6 flex flex-col">
+<h2 class="text-sm font-semibold text-white mb-3">About this model</h2>
+<p class="text-sm text-gray-400 leading-relaxed flex-1">60&nbsp;000 colour images (32×32) across 10 classes. A compact custom CNN with BatchNorm and Dropout was trained offline and can be continuously improved via the safety-gated retraining pipeline.</p>
+<div class="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-3 text-center">
+<div><div class="text-lg font-semibold text-white font-mono">~85.7%</div><div class="text-[11px] text-gray-500">Test accuracy</div></div>
+<div><div class="text-lg font-semibold text-white font-mono">~0.85</div><div class="text-[11px] text-gray-500">Macro F1</div></div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="panel-predict" class="panel" role="tabpanel">
+<div class="mb-6"><h1 class="text-2xl font-bold text-white tracking-tight">Inference</h1><p class="text-sm text-gray-500 mt-1">Upload a single image for class prediction with confidence ranking</p></div>
+<div class="grid lg:grid-cols-2 gap-4">
+<div class="glass rounded-2xl p-5 sm:p-6">
+<div id="drop-zone" class="drop-zone rounded-xl p-10 text-center cursor-pointer min-h-[220px] flex flex-col items-center justify-center" role="button" tabindex="0" aria-label="Upload image for prediction">
+<input id="file-input" type="file" accept="image/png,image/jpeg,image/bmp" class="hidden"/>
+<div class="w-16 h-16 rounded-2xl bg-mint-500/10 border border-mint-500/25 flex items-center justify-center mb-4"><svg class="w-8 h-8 text-mint-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg></div>
+<p class="text-base font-medium text-gray-200">Drag & drop or click to select</p>
+<p class="text-xs text-gray-500 mt-2">Supported: PNG, JPG, JPEG, BMP</p>
+<button type="button" id="browse-btn" class="mt-5 px-4 py-2 rounded-lg bg-mint-500 hover:bg-mint-600 text-ink-950 text-sm font-semibold transition">Browse files</button>
+</div>
+<div class="mt-3 flex justify-end"><button type="button" id="clear-btn" class="text-xs text-gray-500 hover:text-gray-300 transition">Clear result</button></div>
+</div>
+<div class="glass rounded-2xl p-5 sm:p-6 min-h-[220px]">
+<div id="predict-empty" class="h-full flex flex-col items-center justify-center text-center py-8">
+<div class="w-12 h-12 rounded-full bg-ink-700 flex items-center justify-center mb-3"><svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg></div>
+<p class="text-sm text-gray-400">No predictions yet</p>
+<p class="text-xs text-gray-600 mt-1">Upload an image to begin inference</p>
+</div>
+<div id="predict-result" class="hidden space-y-4">
+<div class="flex items-start justify-between gap-3">
+<div><div class="text-[11px] uppercase tracking-wider text-gray-500">Predicted class</div><div id="pred-class" class="text-2xl font-bold text-mint-400 mt-0.5"></div></div>
+<div class="text-right"><div class="text-[11px] uppercase tracking-wider text-gray-500">Confidence</div><div id="pred-conf" class="text-2xl font-mono font-bold text-white mt-0.5"></div></div>
+</div>
+<div><div class="flex justify-between text-[11px] text-gray-500 mb-1"><span>Confidence</span><span id="pred-conf-label"></span></div>
+<div class="h-2 rounded-full bg-ink-700 overflow-hidden"><div id="pred-conf-bar" class="h-full rounded-full bg-gradient-to-r from-mint-600 to-mint-400 transition-all duration-500" style="width:0%"></div></div></div>
+<div class="flex items-center gap-4 text-xs text-gray-500 font-mono"><span>Latency <span id="pred-latency" class="text-gray-300">—</span></span><span>Top-k ranking</span></div>
+<div><canvas id="prob-chart" height="140"></canvas></div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="panel-visualizations" class="panel" role="tabpanel">
+<div class="mb-6"><h1 class="text-2xl font-bold text-white tracking-tight">Analytics</h1><p class="text-sm text-gray-500 mt-1">Class distribution, per-class F1, and confusion matrix</p></div>
+<div id="viz-empty" class="glass rounded-2xl p-12 text-center">
+<div class="w-12 h-12 rounded-full bg-ink-700 mx-auto flex items-center justify-center mb-3"><svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75z"/></svg></div>
+<p class="text-sm text-gray-400">No evaluation metrics yet</p>
+<p class="text-xs text-gray-600 mt-1">Train or retrain to generate visualization data</p>
+</div>
+<div id="viz-content" class="hidden space-y-4">
+<div class="grid sm:grid-cols-3 gap-3">
+<div class="glass rounded-xl p-4 text-center"><div class="text-[11px] text-gray-500 uppercase tracking-wider">Accuracy</div><div id="viz-accuracy" class="text-2xl font-mono font-semibold text-mint-400 mt-1">—</div></div>
+<div class="glass rounded-xl p-4 text-center"><div class="text-[11px] text-gray-500 uppercase tracking-wider">Macro F1</div><div id="viz-f1" class="text-2xl font-mono font-semibold text-cyan-400 mt-1">—</div></div>
+<div class="glass rounded-xl p-4 text-center"><div class="text-[11px] text-gray-500 uppercase tracking-wider">Updated</div><div id="viz-updated" class="text-sm font-mono text-gray-300 mt-2 truncate">—</div></div>
+</div>
+<div class="grid lg:grid-cols-2 gap-4">
+<div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold text-white mb-3">Class distribution</h3><canvas id="dist-chart" height="200"></canvas></div>
+<div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold text-white mb-3">Per-class F1</h3><canvas id="f1-chart" height="200"></canvas></div>
+</div>
+<div class="glass rounded-2xl p-5"><h3 class="text-sm font-semibold text-white mb-3">Confusion matrix</h3><div id="cm-container" class="overflow-x-auto"></div></div>
+</div>
+</section>
+
+<section id="panel-retrain" class="panel" role="tabpanel">
+<div class="mb-6"><h1 class="text-2xl font-bold text-white tracking-tight">Retrain pipeline</h1><p class="text-sm text-gray-500 mt-1">Upload labeled images, fine-tune, promote only if the safety gate passes</p></div>
+<div class="flex items-center gap-2 mb-8 px-1">
+<div class="flex flex-col items-center gap-1"><div class="step-dot active" id="step-1-dot">1</div><span class="text-[10px] text-gray-500 hidden sm:block">Upload</span></div>
+<div class="step-line"></div>
+<div class="flex flex-col items-center gap-1"><div class="step-dot" id="step-2-dot">2</div><span class="text-[10px] text-gray-500 hidden sm:block">Validate</span></div>
+<div class="step-line"></div>
+<div class="flex flex-col items-center gap-1"><div class="step-dot" id="step-3-dot">3</div><span class="text-[10px] text-gray-500 hidden sm:block">Train</span></div>
+<div class="step-line"></div>
+<div class="flex flex-col items-center gap-1"><div class="step-dot" id="step-4-dot">4</div><span class="text-[10px] text-gray-500 hidden sm:block">Evaluate</span></div>
+<div class="step-line"></div>
+<div class="flex flex-col items-center gap-1"><div class="step-dot" id="step-5-dot">5</div><span class="text-[10px] text-gray-500 hidden sm:block">Deploy</span></div>
+</div>
+<div class="grid lg:grid-cols-2 gap-4">
+<div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
+<h2 class="text-sm font-semibold text-white">1 · Dataset upload</h2>
+<div><label for="label-select" class="text-xs text-gray-500 block mb-1.5">Class label (0–9)</label>
+<select id="label-select" class="w-full bg-ink-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-mint-500/40">
+<option value="0">0 — airplane</option><option value="1">1 — automobile</option><option value="2">2 — bird</option>
+<option value="3">3 — cat</option><option value="4">4 — deer</option><option value="5">5 — dog</option>
+<option value="6">6 — frog</option><option value="7">7 — horse</option><option value="8">8 — ship</option>
+<option value="9">9 — truck</option>
+</select></div>
+<div><label class="text-xs text-gray-500 block mb-1.5">Images for selected class</label>
+<input id="retrain-files" type="file" accept="image/png,image/jpeg,image/bmp" multiple class="w-full text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-mint-500/15 file:text-mint-400 file:text-xs file:font-medium"/></div>
+<button type="button" id="upload-images-btn" class="w-full py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-ink-950 text-sm font-semibold transition">Upload images</button>
+<div class="relative flex items-center gap-3 text-xs text-gray-600"><div class="flex-1 h-px bg-white/5"></div><span>or</span><div class="flex-1 h-px bg-white/5"></div></div>
+<div><label class="text-xs text-gray-500 block mb-1.5">ZIP with folders 0–9</label>
+<input id="zip-file" type="file" accept=".zip" class="w-full text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-ink-700 file:text-gray-300 file:text-xs"/></div>
+<button type="button" id="upload-zip-btn" class="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-medium text-gray-300 transition">Upload ZIP</button>
+<p id="upload-status" class="text-xs text-gray-500 min-h-[1.25rem]"></p>
+</div>
+<div class="glass rounded-2xl p-5 sm:p-6 space-y-4">
+<h2 class="text-sm font-semibold text-white">2–5 · Train &amp; promote</h2>
+<p class="text-sm text-gray-400 leading-relaxed">Session uploads: <span id="session-count" class="text-mint-400 font-mono font-semibold">0</span> images. Safety gate compares accuracy on the held-out test set before promotion.</p>
+<button type="button" id="retrain-btn" class="w-full py-3 rounded-xl bg-gradient-to-r from-mint-600 to-emerald-500 hover:from-mint-500 hover:to-emerald-400 text-ink-950 text-sm font-bold transition shadow-glow">Trigger retraining</button>
+<div id="retrain-result" class="hidden rounded-xl p-4 border border-white/10 bg-ink-800/50 space-y-2">
+<div id="retrain-status-line" class="text-sm font-semibold"></div>
+<div class="grid grid-cols-2 gap-2 text-xs font-mono">
+<div class="text-gray-500">Baseline <span id="rt-base" class="text-gray-300"></span></div>
+<div class="text-gray-500">New <span id="rt-new" class="text-gray-300"></span></div>
+<div class="text-gray-500">Δ <span id="rt-delta" class="text-gray-300"></span></div>
+<div class="text-gray-500">Samples <span id="rt-samples" class="text-gray-300"></span></div>
+</div>
+<p id="rt-reason" class="text-xs text-gray-500"></p>
+</div>
+</div>
+</div>
+</section>
+
+<section id="panel-history" class="panel" role="tabpanel">
+<div class="mb-6"><h1 class="text-2xl font-bold text-white tracking-tight">Activity feed</h1><p class="text-sm text-gray-500 mt-1">Audit log of every retrain attempt</p></div>
+<div id="history-empty" class="glass rounded-2xl p-12 text-center">
+<div class="w-12 h-12 rounded-full bg-ink-700 mx-auto flex items-center justify-center mb-3"><svg class="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+<p class="text-sm text-gray-400">No retrain activity yet</p>
+<p class="text-xs text-gray-600 mt-1">Upload data and trigger retraining to populate this feed</p>
+</div>
+<div id="history-list" class="hidden space-y-0 pl-1"></div>
+</section>
+</main>
+<footer class="border-t border-white/5 py-4 mt-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-600 font-mono">
+<span>CIFAR-10 Cycle · Educational MLOps project</span>
+<span id="footer-uptime">—</span>
+</div>
+</footer>
 <script src="/ui/script.js"></script>
 </body>
 </html>
