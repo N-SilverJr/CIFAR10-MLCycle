@@ -92,6 +92,13 @@ async function runPrediction(file, mode) {
     } else {
       document.getElementById("predict-empty").classList.add("hidden");
       document.getElementById("predict-result").classList.remove("hidden");
+      const thumb = document.getElementById("pred-thumb");
+      if (thumb) {
+        if (thumb.dataset.url) URL.revokeObjectURL(thumb.dataset.url);
+        const url = URL.createObjectURL(file);
+        thumb.dataset.url = url;
+        thumb.src = url;
+      }
       setText("pred-class", cls);
       setText("pred-conf", confPct.toFixed(1) + "%");
       setText("pred-conf-label", confPct.toFixed(1) + "%");
@@ -127,6 +134,12 @@ function renderProbChart(data) {
 function clearPrediction() {
   document.getElementById("predict-empty").classList.remove("hidden");
   document.getElementById("predict-result").classList.add("hidden");
+  const thumb = document.getElementById("pred-thumb");
+  if (thumb) {
+    if (thumb.dataset.url) URL.revokeObjectURL(thumb.dataset.url);
+    thumb.removeAttribute("src");
+    delete thumb.dataset.url;
+  }
   if (chartInstances.prob) { chartInstances.prob.destroy(); delete chartInstances.prob; }
   const fi = document.getElementById("file-input");
   if (fi) fi.value = "";
