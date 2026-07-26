@@ -30,12 +30,12 @@ SERVER_START_TIME = time.time()
 
 @app.route("/")
 def serve_frontend():
-    return send_from_directory("frontend", "index.html")
+    return send_from_directory("ui", "index.html")
 
 
 @app.route("/frontend/<path:filename>")
 def serve_static(filename):
-    return send_from_directory("frontend", filename)
+    return send_from_directory("ui", filename)
 
 
 @app.route("/health", methods=["GET"])
