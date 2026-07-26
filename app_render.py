@@ -33,7 +33,7 @@ def serve_frontend():
     return send_from_directory("ui", "index.html")
 
 
-@app.route("/frontend/<path:filename>")
+@app.route("/ui/<path:filename>")
 def serve_static(filename):
     return send_from_directory("ui", filename)
 
