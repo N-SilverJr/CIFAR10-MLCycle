@@ -34,7 +34,7 @@ The project demonstrates:
 |-----------|------|
 | 🎥 Video Demo | **YOUR_YOUTUBE_LINK_HERE** |
 | 🌐 Live Application | https://cifar10-mlcycle.onrender.com |
-| 📂 GitHub Repository | https://github.com/N-SilverJr/CIFAR10-MLCycle |
+| 📂 Notebook | [https://colab.research.google.com](https://colab.research.google.com/drive/16ivbKrkpQSkXBooCxijbGg-XO6CfpzlH#scrollTo=v79zJxUx5ba6) |
 
 > **Note:** The free cloud deployment may require **30–60 seconds** to wake up after periods of inactivity.
 
