@@ -1,90 +1,244 @@
 # CIFAR-10 Image Classification – End-to-End ML Cycle
 
-An end-to-end machine learning pipeline for classifying 32×32 colour images into the 10 CIFAR-10 classes (airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck). Demonstrates the full ML lifecycle: data acquisition, preprocessing, model training & evaluation, API serving, web UI, continuous retraining with a safety gate, Docker scaling and Locust load testing.
+A complete end-to-end machine learning pipeline for classifying **32×32 RGB images** into the **10 CIFAR-10 classes**, covering the entire ML lifecycle from data preparation to deployment.
 
-> This project was built from scratch using the structure and engineering patterns of a reference handwritten-digit pipeline, but targets a completely different dataset (CIFAR-10 RGB images instead of MNIST grayscale digits).
+**Classes**
 
-## Demo & Deployment
+- ✈️ Airplane
+- 🚗 Automobile
+- 🐦 Bird
+- 🐱 Cat
+- 🦌 Deer
+- 🐶 Dog
+- 🐸 Frog
+- 🐴 Horse
+- 🚢 Ship
+- 🚚 Truck
 
-- **Video Demo:** [YouTube Link](YOUR_YOUTUBE_LINK_HERE)  
-  (Record with camera on: Predict flow + Upload → Retrain → History flow)
-- **Live Deployment (optional):** Deploy with `Dockerfile.render` on Render / Railway / Fly.io.  
-  Free-tier deployments use ONNX Runtime (inference only). Full retraining requires the local Docker setup.
+The project demonstrates:
 
-## Project Description
+- Data acquisition and preprocessing
+- Custom CNN development and evaluation
+- Flask REST API
+- Interactive web dashboard
+- Safety-gated model retraining
+- Docker + Nginx deployment
+- Load testing with Locust
+- Cloud deployment using ONNX Runtime
 
-Key engineering decisions:
+---
 
-- **Custom CNN (not transfer learning):** 32×32 inputs make heavy ImageNet models wasteful. A compact 6-conv-block network with BatchNorm + Dropout (~1.2 M parameters) trains fast and fits comfortably in Docker memory limits.
-- **Safety-gated retraining:** New images can be uploaded through the UI. Before a retrained model replaces the live weights it is evaluated on the held-out CIFAR-10 test set. If accuracy drops more than 1 percentage point the update is rejected and the original model is kept.
-- **Dual deployment path:** Full TensorFlow stack (training + inference) for local / Docker; lightweight ONNX Runtime path for memory-constrained cloud free tiers.
-- **Horizontal scaling:** Nginx reverse-proxy + Docker Compose `--scale` lets you measure latency under load with 1, 2 or 4 replicas (Locust results included).
+# Demo
 
-## Architecture
+| Resource | Link |
+|-----------|------|
+| 🎥 Video Demo | **YOUR_YOUTUBE_LINK_HERE** |
+| 🌐 Live Application | https://cifar10-mlcycle.onrender.com |
+| 📂 GitHub Repository | https://github.com/N-SilverJr/CIFAR10-MLCycle |
+
+> **Note:** The free cloud deployment may require **30–60 seconds** to wake up after periods of inactivity.
+
+> **Note:** Retraining is available only in the local/Docker deployment. The cloud version is inference-only using ONNX Runtime.
+
+---
+
+# Project Overview
+
+This project implements a production-style machine learning workflow rather than just a trained model.
+
+It includes:
+
+- Custom CNN designed specifically for CIFAR-10
+- Model training and evaluation
+- REST API for inference
+- Browser-based dashboard
+- Upload-based retraining
+- Safety gate preventing degraded models from replacing the production model
+- Cloud deployment
+- Performance testing
+- Monitoring visualizations
+
+---
+
+# Model Architecture
+
+The selected model is a custom Convolutional Neural Network containing approximately **1.2 million parameters**.
+
+Architecture:
+
+- Conv → BatchNorm
+- Conv → BatchNorm
+- MaxPooling
+- Dropout
+
+(repeated three times)
+
+Followed by:
+
+- Global Average Pooling
+- Dense output layer
+
+The network is optimized using:
+
+- Batch Normalization
+- Dropout
+- EarlyStopping
+- ReduceLROnPlateau
+- Optional Keras data augmentation layers
+
+Unlike transfer learning approaches, the network is built specifically for **32×32 CIFAR-10 images**.
+
+---
+
+# Safety-Gated Retraining
+
+The application supports controlled retraining using newly uploaded labeled images.
+
+Workflow:
+
+1. Upload labeled images
+2. Fine-tune the existing model
+3. Evaluate on the held-out test set
+4. Compare against the baseline model
+5. Promote only if performance remains within the allowed tolerance
+
+If the retrained model performs worse than the baseline, the deployment is rejected automatically and the previous production model remains active.
+
+---
+
+# Closed-Set Inference & Out-of-Distribution Handling
+
+The classifier is a **closed-set classifier**, meaning it always predicts one of the ten CIFAR-10 classes.
+
+To improve reliability, the API evaluates prediction confidence.
+
+The application detects:
+
+- Low confidence predictions
+- Small decision margins
+- Possible out-of-scope images
+
+If confidence is high on an unrelated image, the application explains that this is normal neural-network overconfidence and that confidence only reflects certainty **among the ten known classes**.
+
+---
+
+# Runtime Options
+
+The project supports two deployment modes.
+
+### Local / Docker
+
+- TensorFlow
+- Full retraining support
+- Full dashboard functionality
+
+### Cloud Deployment
+
+- ONNX Runtime
+- Lightweight inference
+- Optimized for free-tier hosting
+- Inference only
+
+---
+
+# Model Performance
+
+| Experiment | Architecture | Test Accuracy | Macro F1 |
+|------------|--------------|--------------:|----------:|
+| Baseline CNN | Conv-Pool ×2 + Dense | ~71% | ~0.71 |
+| **Enhanced CNN (Selected)** | Conv-BN Blocks + GAP + Dropout | **~85.7%** | **~0.85** |
+| Enhanced + Augmentation | Same + RandomFlip / Translation / Rotation | ~78.7% | ~0.78 |
+
+The production model is selected based on the highest **Macro F1 Score**.
+
+Saved model:
 
 ```
-User → Browser Dashboard (HTML / JS / Tailwind / DaisyUI / Chart.js)
-         │
-         ▼
-Flask API (app.py)
-  /health            model status, uptime, parameters
-  /predict           single image classification
-  /upload            bulk image / ZIP upload for retraining
-  /retrain           trigger retraining with safety gate
-  /retrain-history   audit log of all retrain attempts
-  /visualizations    class distribution, F1 scores, confusion matrix
-         │
-         ▼
-CNN Model (cifar10_classifier.h5 / .onnx)
-         │
-         ▼
-CIFAR-10 (50 000 train / 10 000 test, 32×32 RGB, 10 classes)
+models/cifar10_classifier.h5
 ```
 
-## Model Performance (typical after notebook experiments)
+Cloud deployment uses:
 
-| Experiment              | Architecture                          | Test Accuracy | Macro F1 |
-|-------------------------|---------------------------------------|---------------|----------|
-| 1. Baseline CNN         | Conv-Pool-Conv-Pool-Dense             | ~70 %         | ~0.70    |
-| 2. Enhanced CNN (selected) | 3×(Conv-BN-Conv-BN-Pool-Dropout) + GAP | ~82–85 %   | ~0.82–0.85 |
-| 3. Enhanced + Augmentation | Same + ImageDataGenerator           | ~84–87 %      | ~0.84–0.87 |
+```
+models/cifar10_classifier.onnx
+```
 
-Exact numbers appear in the notebook after you run it. Experiment 2 or 3 is selected by highest macro-F1; the chosen weights become `models/cifar10_classifier.h5`.
+Evaluation metrics are stored in:
 
-## Flood Request Simulation (Locust)
+```
+models/eval_metrics.json
+```
 
-Run after `docker compose up`:
+Metrics include:
+
+- Accuracy
+- Precision
+- Recall
+- Macro F1
+- Confusion Matrix
+- Per-Class F1
+
+---
+
+# Load Testing
+
+The Flask API was stress tested using **Locust**.
+
+Configuration:
+
+- 10 concurrent users
+- Spawn rate: 2 users/second
+- Duration: 30 seconds
+- Synthetic 32×32 RGB images
+
+Results:
+
+| Setup | Requests | Median Latency | Average Latency | Throughput | Max Latency | Failures |
+|--------|---------:|---------------:|----------------:|------------:|------------:|----------:|
+| Local (1 Process) | 246 | **85 ms** | 148 ms | ~8.5 req/s | 1636 ms | **0** |
+
+Scaling is supported using Docker Compose and Nginx.
 
 ```bash
-chmod +x locust/run_scaling_test.sh
-./locust/run_scaling_test.sh
+docker compose up -d --scale app=1
+docker compose up -d --scale app=2
+docker compose up -d --scale app=4
 ```
 
-Typical pattern observed on a single host (results will vary with hardware):
+Example Locust command:
 
-| Containers | Median Latency | Throughput | Failures |
-|------------|----------------|------------|----------|
-| 1          | higher         | baseline   | 0        |
-| 2          | ~40–60 % lower | higher     | 0        |
-| 4          | further drop (diminishing returns) | modest gain | 0 |
+```bash
+locust \
+-f locust/locustfile.py \
+--host=http://localhost:8080 \
+--users 50 \
+--spawn-rate 10 \
+--run-time 60s \
+--headless \
+--csv=locust/results/scale_N
+```
 
-CSV and HTML reports land in `locust/results/`.
-
-## Technologies
-
-- **Model:** TensorFlow / Keras (custom CNN, BatchNorm, Dropout, EarlyStopping, ReduceLROnPlateau)
-- **API:** Flask + Gunicorn
-- **Frontend:** HTML, JavaScript, Tailwind CSS, DaisyUI, Chart.js
-- **Containerization:** Docker, Docker Compose, Nginx
-- **Cloud:** Optional ONNX Runtime path (`Dockerfile.render`)
-- **Load Testing:** Locust
-- **Dataset:** CIFAR-10
-
-## Project Structure
+Generated CSV reports are saved inside:
 
 ```
+locust/results/
+```
+
+---
+
+# Repository Structure
+
+```text
 CIFAR10-MLCycle/
 ├── README.md
+├── app.py                 # Full Flask API (TensorFlow)
+├── app_render.py          # Lightweight ONNX API
+├── requirements.txt
+├── requirements-render.txt
+├── Dockerfile
+├── Dockerfile.render
+├── docker-compose.yml
+├── nginx.conf
 ├── notebook/
 │   └── cifar10_classification.ipynb
 ├── src/
@@ -92,110 +246,253 @@ CIFAR10-MLCycle/
 │   ├── model.py
 │   ├── prediction.py
 │   └── prediction_onnx.py
-├── data/
-│   ├── train/          (generated by notebook)
-│   ├── test/           (generated by notebook)
-│   └── retrain/        (populated at runtime via UI uploads)
-├── models/
-│   ├── cifar10_classifier.h5      ← produced by notebook
-│   ├── cifar10_classifier.onnx    ← optional, via scripts/convert_to_onnx.py
-│   └── eval_metrics.json          ← produced by notebook / scripts
-├── frontend/
+├── ui/
 │   ├── index.html
 │   └── script.js
-├── locust/
-│   ├── locustfile.py
-│   ├── run_scaling_test.sh
-│   └── results/
-├── scripts/
-│   ├── generate_eval_metrics.py
-│   └── convert_to_onnx.py
-├── app.py
-├── app_render.py
-├── Dockerfile
-├── Dockerfile.render
-├── docker-compose.yml
-├── nginx.conf
-├── requirements.txt
-└── requirements-render.txt
+├── data/
+│   ├── train/
+│   ├── test/
+│   └── retrain/
+├── models/
+│   ├── cifar10_classifier.h5
+│   ├── cifar10_classifier.onnx
+│   └── eval_metrics.json
+└── locust/
+    ├── locustfile.py
+    └── results/
 ```
 
-## Setup Instructions
+---
 
-### Prerequisites
-- Python 3.11
-- Docker & Docker Compose (for containerised deployment)
-- ~4 GB RAM recommended for training
+# Quick Start
 
-### 1. Local development (full stack)
+## 1. Create a Virtual Environment
 
-```bash
-git clone <your-repo-url>
+```powershell
 cd CIFAR10-MLCycle
 
-python3.11 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m venv .venv
+
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-# Run the notebook – this downloads CIFAR-10, trains models,
-# writes data/train/*.npy, data/test/*.npy and models/cifar10_classifier.h5
-jupyter notebook notebook/cifar10_classification.ipynb
-# → Run All Cells
+---
 
-# Optional: regenerate metrics if you only have the .h5
-python scripts/generate_eval_metrics.py
+## 2. Prepare Data & Model
 
-# Start the API + UI
+Train the model inside the notebook (or Google Colab), then place the generated files into the project.
+
+Required model files:
+
+```
+models/cifar10_classifier.h5
+models/eval_metrics.json
+```
+
+Required datasets:
+
+```
+data/train/*.npy
+data/test/*.npy
+```
+
+---
+
+## 3. Run the Application
+
+```powershell
 python app.py
-# Open http://localhost:5000
 ```
 
-### 2. Docker (scalable)
+Open:
+
+```
+http://127.0.0.1:5000
+```
+
+Available dashboard pages:
+
+| Page | Description |
+|------|-------------|
+| Overview | Health, uptime, quick prediction |
+| Inference | Single image classification |
+| Analytics | Class distribution, F1 scores, confusion matrix |
+| Retrain | Upload images and retrain |
+| Activity | Retraining audit history |
+
+---
+
+## 4. Docker Deployment
+
+Build
 
 ```bash
-# After the notebook has produced the model & .npy files
 docker compose build
+```
+
+Run
+
+```bash
 docker compose up -d --scale app=1
-# UI at http://localhost:8080
-
-# Scale to 2 or 4 replicas
-docker compose up -d --scale app=2
-docker compose up -d --scale app=4
 ```
 
-### 3. Locust load test
+Application:
+
+```
+http://localhost:8080
+```
+
+Stop
 
 ```bash
-./locust/run_scaling_test.sh
-# or interactively:
-locust -f locust/locustfile.py --host=http://localhost:8080
+docker compose down
 ```
 
-### 4. Cloud (ONNX, inference only)
+---
 
-```bash
-pip install tf2onnx onnxruntime
-python scripts/convert_to_onnx.py   # creates models/cifar10_classifier.onnx
+## 5. Cloud Deployment
 
-# On Render / Railway / etc. set Dockerfile path to Dockerfile.render
+The cloud version uses:
+
+- Dockerfile.render
+- app_render.py
+- models/cifar10_classifier.onnx
+
+Example deployment:
+
+```
+https://cifar10-mlcycle.onrender.com
 ```
 
-## Rubric Mapping
+---
 
-| Criterion | How this project satisfies it |
-|-----------|-------------------------------|
-| **Video Demo** | Record camera-on video of (1) image upload → correct class prediction, (2) labelled image/ZIP upload → Retrain button → History shows promoted/rejected. Put YouTube link above. |
-| **Retraining Process** | UI `/upload` (images + label **or** ZIP of folders 0-9) → saves under `data/retrain/`. `/retrain` runs `load_and_preprocess_dataset` then fine-tunes the **custom pre-trained CNN** with a 1 pp safety gate. |
-| **Prediction Process** | Drop-zone / file input → `/predict` → returns class name, confidence and full probability vector. Correct on CIFAR-10 style images. |
-| **Evaluation of Models** | Notebook contains full preprocessing, 3 experiments with BatchNorm, Dropout, EarlyStopping, ReduceLROnPlateau, data augmentation; metrics: Accuracy, Loss, Precision, Recall, Macro-F1, per-class F1, Confusion Matrix. |
-| **Deployment Package** | Web UI with uptime, class-distribution chart, per-class F1, confusion matrix. Docker Compose + Nginx. Optional public URL via ONNX path. Locust results for multiple container counts. |
+# API Endpoints
 
-## Constraints & Limitations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health status, uptime and model information |
+| POST | `/predict` | Predict image class |
+| POST | `/upload` | Upload labeled images or ZIP archive |
+| POST | `/retrain` | Fine-tune model using uploaded images |
+| GET | `/retrain-history` | View retraining history |
+| GET | `/visualizations` | Retrieve dashboard metrics |
 
-- Free-tier cloud memory limits force the ONNX-only path (no retraining in the cloud).
-- Multi-replica Docker: a promoted retrain updates only the container that handled the request; other replicas keep the previous weights until restarted (acceptable for a demonstration).
-- `data/train` and `data/test` `.npy` files are git-ignored; regenerate them by running the notebook.
+---
 
-## Licence
+# Prediction Response
 
-Educational / assignment use.
+Important response fields include:
+
+| Field | Description |
+|-------|-------------|
+| `predicted_class` | Predicted CIFAR-10 class |
+| `confidence` | Top-1 prediction probability |
+| `decision_margin` | Difference between top-1 and top-2 probabilities |
+| `in_domain` | Indicates whether prediction appears in-domain |
+| `warning` | Confidence or ambiguity warning |
+| `note` | Closed-set explanation for high-confidence predictions |
+
+---
+
+# Handling Images Outside CIFAR-10
+
+Since the model is a closed-set classifier, it cannot return an "unknown" class.
+
+Instead, it behaves as follows:
+
+| Situation | Behavior |
+|-----------|----------|
+| Confidence < 0.45 | Prediction flagged as likely out-of-scope |
+| Small decision margin | Prediction marked as ambiguous |
+| High confidence on unrelated image | User informed that confidence only reflects certainty among the ten known classes |
+
+---
+
+# Edge Cases
+
+| Scenario | Protection |
+|----------|------------|
+| Missing image | Client and server validation |
+| Invalid file | Only PNG, JPG, JPEG, BMP and ZIP accepted |
+| Retraining without uploads | UI blocks request and API returns HTTP 400 |
+| Retraining decreases accuracy | Safety gate rejects the updated model |
+
+---
+
+# Notebook Highlights
+
+The training notebook demonstrates:
+
+- Loading the CIFAR-10 dataset
+- Dataset exploration
+- Class balance visualization
+- Mean image visualization
+- Data normalization
+- One-hot encoding
+- Stratified train/validation split
+- Three CNN experiments
+- EarlyStopping
+- ReduceLROnPlateau
+- Accuracy
+- Precision
+- Recall
+- Macro F1
+- Confusion Matrix
+- Saving the trained model
+- Saving evaluation metrics
+- Safety-gated retraining demonstration
+
+---
+
+# Technologies Used
+
+### Machine Learning
+
+- TensorFlow
+- Keras
+- ONNX Runtime
+- NumPy
+- scikit-learn
+- Pillow
+
+### Backend
+
+- Flask
+- Flask-CORS
+- Gunicorn
+
+### Frontend
+
+- HTML
+- JavaScript
+- Tailwind CSS
+- Chart.js
+- IBM Plex
+
+### Deployment
+
+- Docker
+- Docker Compose
+- Nginx
+
+### Testing
+
+- Locust
+
+---
+
+# Summary
+
+This project demonstrates a complete production-oriented machine learning workflow using the CIFAR-10 dataset. It combines model development, evaluation, deployment, retraining, monitoring, cloud inference, and performance testing into a single end-to-end application while incorporating practical safeguards such as confidence-based warnings and safety-gated retraining.

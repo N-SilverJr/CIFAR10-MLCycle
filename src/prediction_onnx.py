@@ -20,6 +20,8 @@ CLASS_NAMES = [
     "dog", "frog", "horse", "ship", "truck",
 ]
 
+CONFIDENCE_THRESHOLD = 0.45
+
 
 def _preprocess_image_array(img):
     """Convert PIL image to normalized (1, 32, 32, 3) float32 array."""
@@ -50,9 +52,19 @@ def predict_single_onnx(session, image_bytes):
         probabilities = exp_preds / np.sum(exp_preds)
 
     predicted_idx = int(np.argmax(probabilities))
-    return {
+    conf = float(probabilities[predicted_idx])
+    in_domain = conf >= CONFIDENCE_THRESHOLD
+    result = {
         "predicted_class": CLASS_NAMES[predicted_idx],
         "predicted_index": predicted_idx,
-        "confidence": float(probabilities[predicted_idx]),
+        "confidence": conf,
         "probabilities": {name: float(p) for name, p in zip(CLASS_NAMES, probabilities)},
+        "in_domain": in_domain,
+        "confidence_threshold": CONFIDENCE_THRESHOLD,
+        "warning": None if in_domain else (
+            "Low confidence — this image may not belong to any CIFAR-10 class "
+            "(airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck). "
+            f"Best guess is shown below ({CLASS_NAMES[predicted_idx]}, {conf*100:.1f}%)."
+        ),
     }
+    return result

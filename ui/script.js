@@ -71,6 +71,11 @@ async function fetchHealth() {
 }
 
 async function runPrediction(file, mode) {
+  if (!file) { alert("Please select an image file first."); return; }
+  if (!file.type || !file.type.startsWith("image/")) {
+    alert("Unsupported file type. Please upload a PNG, JPG, JPEG, or BMP image.");
+    return;
+  }
   const formData = new FormData();
   formData.append("file", file);
   try {
@@ -84,11 +89,25 @@ async function runPrediction(file, mode) {
     }
     const confPct = conf <= 1 ? conf * 100 : conf;
     const cls = data.class_name || data.predicted_class || CLASS_NAMES[data.class_index] || "—";
+    const inDomain = data.in_domain !== false && !data.warning;
+    const warnText = data.warning || null;
+
     if (mode === "quick") {
       document.getElementById("quick-result").classList.remove("hidden");
-      setText("quick-class", cls);
+      const qw = document.getElementById("quick-warning");
+      if (qw) {
+        if (warnText) { qw.textContent = warnText; qw.classList.remove("hidden"); }
+        else { qw.textContent = ""; qw.classList.add("hidden"); }
+      }
+      setText("quick-class", inDomain ? cls : "Outside CIFAR-10?");
+      document.getElementById("quick-class").className = inDomain
+        ? "text-lg font-semibold text-mint-400"
+        : "text-lg font-semibold text-amber-400";
       setText("quick-conf", confPct.toFixed(1) + "%");
       document.getElementById("quick-conf-bar").style.width = Math.min(100, confPct) + "%";
+      document.getElementById("quick-conf-bar").className = inDomain
+        ? "h-full rounded-full bg-gradient-to-r from-mint-600 to-mint-400 transition-all duration-500"
+        : "h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-500";
     } else {
       document.getElementById("predict-empty").classList.add("hidden");
       document.getElementById("predict-result").classList.remove("hidden");
@@ -99,10 +118,21 @@ async function runPrediction(file, mode) {
         thumb.dataset.url = url;
         thumb.src = url;
       }
-      setText("pred-class", cls);
+      const pw = document.getElementById("pred-warning");
+      if (pw) {
+        if (warnText) { pw.textContent = warnText; pw.classList.remove("hidden"); }
+        else { pw.textContent = ""; pw.classList.add("hidden"); }
+      }
+      setText("pred-class", inDomain ? cls : "Outside CIFAR-10?");
+      document.getElementById("pred-class").className = inDomain
+        ? "text-2xl font-bold text-mint-400 mt-0.5"
+        : "text-2xl font-bold text-amber-400 mt-0.5";
       setText("pred-conf", confPct.toFixed(1) + "%");
       setText("pred-conf-label", confPct.toFixed(1) + "%");
       document.getElementById("pred-conf-bar").style.width = Math.min(100, confPct) + "%";
+      document.getElementById("pred-conf-bar").className = inDomain
+        ? "h-full rounded-full bg-gradient-to-r from-mint-600 to-mint-400 transition-all duration-500"
+        : "h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-500";
       setText("pred-latency", data.processing_time_ms != null ? data.processing_time_ms + " ms" : "—");
       renderProbChart(data);
     }
@@ -183,6 +213,12 @@ async function handleZipUpload() {
 
 async function triggerRetrain() {
   const btn = document.getElementById("retrain-btn");
+  if (sessionUploadCount <= 0) {
+    const status = document.getElementById("upload-status");
+    if (status) status.textContent = "Upload at least one labeled image (or a ZIP) before triggering retraining.";
+    alert("No images uploaded yet.\n\nGo to step 1, upload images with a class label (0–9), then click Retrain.");
+    return;
+  }
   btn.disabled = true; btn.textContent = "Training…";
   document.getElementById("step-2-dot").classList.add("active");
   document.getElementById("step-3-dot").classList.add("active");
@@ -207,8 +243,12 @@ async function triggerRetrain() {
     setText("rt-reason", data.reason || "");
     fetchRetrainHistory();
     if (data.promoted) fetchVisualizations();
-  } catch (err) { alert(err.message || String(err)); }
-  finally { btn.disabled = false; btn.textContent = "Trigger retraining"; }
+  } catch (err) {
+    const msg = err.message || String(err);
+    alert(msg);
+    const status = document.getElementById("upload-status");
+    if (status) status.textContent = msg;
+  } finally { btn.disabled = false; btn.textContent = "Trigger retraining"; }
 }
 
 async function fetchRetrainHistory() {
