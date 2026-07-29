@@ -32,9 +32,9 @@ The project demonstrates:
 
 | Resource | Link |
 |-----------|------|
-| 🎥 Video Demo | **YOUR_YOUTUBE_LINK_HERE** |
-| 🌐 Live Application | https://cifar10-mlcycle.onrender.com |
-| 📂 Notebook | [https://colab.research.google.com](https://colab.research.google.com/drive/16ivbKrkpQSkXBooCxijbGg-XO6CfpzlH#scrollTo=v79zJxUx5ba6) |
+| 🎥 Video Demo | **https://youtu.be/n7WqF-CutXE** |
+| 🌐 Live Application | **https://cifar10-mlcycle.onrender.com** |
+| 📂 Notebook | [**https://colab.research.google.com**](https://colab.research.google.com/drive/16ivbKrkpQSkXBooCxijbGg-XO6CfpzlH#scrollTo=v79zJxUx5ba6) |
 
 > **Note:** The free cloud deployment may require **30–60 seconds** to wake up after periods of inactivity.
 
